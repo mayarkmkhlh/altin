@@ -34,3 +34,10 @@
 - `releasing` sits between approval and PayPal's SUCCESS, because payouts take about 30 seconds.
 - The payback suggestion is what the host gave at the giver's own gathering; it is only a default and stays editable.
 - The engine is pure functions with no database or network, so every state change is tested in milliseconds.
+
+## The agent (t050)
+- Three tools only (council cap): create_circle, send_member_invoices, propose_payout. Swapping turns waits.
+- The agent's PayPal access is createInvoice and sendInvoice only; payouts aren't reachable from any tool.
+- The model passes amounts as said ("1000", SAR); code converts to USD cents, so the model never does money arithmetic.
+- Tool inputs are Zod schemas, so a bad call (one member, negative amount) is rejected before any code runs.
+- Muse Spark through the Vercel AI SDK's OpenAI-compatible provider, with the same env names as Sijil.

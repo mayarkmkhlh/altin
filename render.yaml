@@ -14,3 +14,11 @@ services:
         sync: false
       - key: PAYPAL_CLIENT_SECRET
         sync: false
+      - key: ORGANIZER_EMAIL
+        sync: false
+      - key: MODEL_API_KEY
+        sync: false
+      - key: MODEL_API_BASE_URL
+        value: https://api.meta.ai/v1
+      - key: MUSE_SPARK_MODEL
+        value: muse-spark-1.3

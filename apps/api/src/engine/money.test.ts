@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { assertCents, centsToUsdString, sarLabel } from "./money";
+import { assertCents, centsToUsdString, sarLabel, toUsdCents } from "./money";
+
+test("amounts said in USD or SAR become USD cents, rounded to the nearest cent", () => {
+  assert.equal(toUsdCents(300, "USD"), 30000);
+  assert.equal(toUsdCents(80.5, "USD"), 8050);
+  assert.equal(toUsdCents(1000, "SAR"), 26667);
+  assert.equal(toUsdCents(375, "SAR"), 10000);
+});
 
 test("cents become PayPal's USD string without floating point", () => {
   assert.equal(centsToUsdString(5), "0.05");

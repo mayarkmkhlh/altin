@@ -44,6 +44,9 @@ export const sendMemberInvoicesInput = z.object({
 });
 
 export async function createCircleAction(deps: AgentDeps, input: z.infer<typeof createCircleInput>) {
+  if (deps.session.circleId) {
+    throw new Error("This conversation already has a circle. Start a new conversation to create another one.");
+  }
   const suggestedPledgeCents = input.suggestedPledge
     ? toUsdCents(input.suggestedPledge.amount, input.suggestedPledge.currency)
     : null;
@@ -182,6 +185,34 @@ export async function proposePayoutAction(deps: AgentDeps) {
     sar: sarLabel(payout.amountCents),
     nextStep: "Waiting for the organizer to press Approve. Nothing has been paid.",
   };
+}
+
+// The chat history only carries text replies, so each turn tells the model what already exists.
+export async function circleSummary(deps: AgentDeps): Promise<string | null> {
+  if (!deps.session.circleId) return null;
+  const record = await deps.store.loadCircle(deps.session.circleId);
+  const { circle } = record;
+  const nameOf = (id: string) => circle.members.find((m) => m.id === id)!.name;
+
+  const lines = [
+    `Current circle: ${record.name} (already created; do not create it again)`,
+    `Rotation: ${circle.turns.map((turn) => nameOf(turn.hostId)).join(" → ")}`,
+    `Usual amount: ${
+      record.suggestedPledgeCents
+        ? `${centsToUsdString(record.suggestedPledgeCents)} USD (${sarLabel(record.suggestedPledgeCents)})`
+        : "none"
+    }`,
+  ];
+  const turn = currentTurn(circle);
+  if (turn) {
+    const paid = turn.invoices.filter((invoice) => invoice.status === "paid").length;
+    lines.push(
+      `Gathering ${turn.monthIndex} (host ${nameOf(turn.hostId)}): ${turn.status}, ${paid} of ${turn.invoices.length} invoices paid`,
+    );
+  } else {
+    lines.push("All gatherings are done.");
+  }
+  return lines.join("\n");
 }
 
 function requireCircleId(deps: AgentDeps): string {

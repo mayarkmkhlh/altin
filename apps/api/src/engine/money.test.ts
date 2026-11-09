@@ -15,9 +15,10 @@ test("cents become PayPal's USD string without floating point", () => {
   assert.equal(centsToUsdString(100000), "1000.00");
 });
 
-test("SAR is a display label at the 3.75 peg", () => {
-  assert.equal(sarLabel(1000), "≈ 37.50 SAR");
-  assert.equal(sarLabel(1), "≈ 0.04 SAR");
+test("SAR is a display label at the 3.75 peg, in whole riyals", () => {
+  assert.equal(sarLabel(26667), "≈ 1000 SAR");
+  assert.equal(sarLabel(1000), "≈ 38 SAR");
+  assert.equal(sarLabel(20050), "≈ 752 SAR");
 });
 
 test("amounts must be positive whole cents", () => {

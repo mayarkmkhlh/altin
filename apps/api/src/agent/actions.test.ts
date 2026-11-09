@@ -3,7 +3,13 @@ import { test } from "node:test";
 import type { PGlite } from "@electric-sql/pglite";
 import { CircleStore } from "../store/circle-store";
 import { testDb } from "../test/test-db";
-import { type AgentDeps, createCircleAction, proposePayoutAction, sendMemberInvoicesAction } from "./actions";
+import {
+  type AgentDeps,
+  circleSummary,
+  createCircleAction,
+  proposePayoutAction,
+  sendMemberInvoicesAction,
+} from "./actions";
 
 function fakePayPal() {
   const created: { requestId: string; recipientEmail: string; amountCents: number }[] = [];
@@ -62,7 +68,32 @@ test("create_circle converts a riyal amount in code, not in the model", async ()
   const result = await createCircleAction(deps, sisterFirst);
 
   assert.equal(result.usualPledge?.usd, "266.67");
-  assert.equal(result.usualPledge?.sar, "≈ 1000.01 SAR");
+  assert.equal(result.usualPledge?.sar, "≈ 1000 SAR");
+});
+
+test("create_circle refuses to make a second circle in the same conversation", async () => {
+  const { db, deps } = await setup();
+  await createCircleAction(deps, sisterFirst);
+
+  await assert.rejects(createCircleAction(deps, sisterFirst), /already/);
+  const { rows } = await db.query<{ count: number }>("select count(*)::int as count from circles");
+  assert.equal(rows[0]!.count, 1);
+});
+
+test("the circle summary tells the model what already exists", async () => {
+  const { deps } = await setup();
+  await createCircleAction(deps, sisterFirst);
+  await sendMemberInvoicesAction(deps, { pledges: [{ memberName: "Layla", amount: 300, currency: "USD" }] });
+
+  const summary = await circleSummary(deps);
+  assert.match(summary!, /Gold day/);
+  assert.match(summary!, /Mariam → Layla → Noor/);
+  assert.match(summary!, /Gathering 1 \(host Mariam\): collecting, 0 of 2 invoices paid/);
+});
+
+test("there is no summary before a circle exists", async () => {
+  const { deps } = await setup();
+  assert.equal(await circleSummary(deps), null);
 });
 
 test("send_member_invoices invoices everyone except the host, once", async () => {
@@ -80,7 +111,7 @@ test("send_member_invoices invoices everyone except the host, once", async () =>
   assert.equal(paypal.sent.length, 2);
   assert.match(paypal.created[0]!.requestId, /^altin-.+-m1-.+$/);
 
-  const second = await sendMemberInvoicesAction(deps, {});
+  const second = await sendMemberInvoicesAction(deps, { pledges: [] });
   assert.deepEqual(second.sent, []);
   assert.deepEqual(second.alreadyInvoiced, ["Layla", "Noor"]);
   assert.equal(paypal.created.length, 2);

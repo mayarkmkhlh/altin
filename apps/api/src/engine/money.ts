@@ -23,6 +23,5 @@ export function toUsdCents(amount: number, currency: SpokenCurrency): number {
 }
 
 export function sarLabel(cents: number): string {
-  const halalas = Math.round(cents * SAR_PER_USD);
-  return `≈ ${centsToUsdString(halalas)} SAR`;
+  return `≈ ${Math.round((cents * SAR_PER_USD) / 100)} SAR`;
 }

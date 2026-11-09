@@ -2,6 +2,7 @@ import { generateText, type LanguageModel, type ModelMessage, stepCountIs, tool 
 import { z } from "zod";
 import {
   type AgentDeps,
+  circleSummary,
   createCircleAction,
   createCircleInput,
   proposePayoutAction,
@@ -9,7 +10,11 @@ import {
   sendMemberInvoicesInput,
 } from "./actions";
 
-function systemPrompt(today: string): string {
+function systemPrompt(today: string, summary: string | null): string {
+  return `${basePrompt(today)}\n\n${summary ?? "No circle has been created in this conversation yet."}`;
+}
+
+function basePrompt(today: string): string {
   return `You are Altın, the treasurer assistant for the organizer of a rotating savings circle
 (altın günü, jam'iya, tanda, susu). Today is ${today}.
 
@@ -53,7 +58,7 @@ export async function runAgent(input: {
 }): Promise<{ reply: string; circleId?: string; toolCalls: string[] }> {
   const result = await generateText({
     model: input.model,
-    system: systemPrompt(input.today),
+    system: systemPrompt(input.today, await circleSummary(input.deps)),
     messages: input.messages,
     tools: createTools(input.deps),
     stopWhen: stepCountIs(6),

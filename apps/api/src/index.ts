@@ -5,8 +5,10 @@ import { z } from "zod";
 import type { AgentDeps } from "./agent/actions";
 import { runAgent } from "./agent/agent";
 import { museSparkModel } from "./agent/model";
+import { circleView } from "./circle-view";
 import { pool } from "./db";
 import { PayPalClient } from "./engine/paypal-client";
+import { approvePayout, checkReleasingPayouts } from "./payouts/approval";
 import { CircleStore } from "./store/circle-store";
 import { pgDb } from "./store/db";
 
@@ -18,7 +20,9 @@ const AGENT_CALLS_PER_HOUR = 60;
 
 const store = new CircleStore(pgDb(pool));
 let paypal: PayPalClient | undefined;
+const getPayPal = () => (paypal ??= PayPalClient.fromEnv());
 let agentWindow = { startedAt: Date.now(), calls: 0 };
+const uuid = z.uuid();
 
 const agentRequest = z.object({
   circleId: z.uuid().optional(),
@@ -50,10 +54,9 @@ app.post("/api/agent", async (c) => {
   if (agentWindow.calls >= AGENT_CALLS_PER_HOUR) return c.json({ error: "The assistant is busy, try again later" }, 429);
   agentWindow.calls += 1;
 
-  paypal ??= PayPalClient.fromEnv();
   const deps: AgentDeps = {
     store,
-    paypal,
+    paypal: getPayPal(),
     organizerEmail: process.env.ORGANIZER_EMAIL ?? "organizer@altin.example",
     session: { circleId: parsed.data.circleId },
   };
@@ -69,6 +72,40 @@ app.post("/api/agent", async (c) => {
   } catch (err) {
     console.error(err);
     return c.json({ error: "The assistant could not answer" }, 502);
+  }
+});
+
+app.get("/api/circles/:circleId", async (c) => {
+  const circleId = c.req.param("circleId");
+  if (!uuid.safeParse(circleId).success) return c.json({ error: "Circle not found" }, 404);
+
+  try {
+    await checkReleasingPayouts({ store, paypal: getPayPal() }, circleId);
+  } catch (err) {
+    console.error(err);
+  }
+  try {
+    return c.json(await circleView(store, circleId));
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("not found")) return c.json({ error: "Circle not found" }, 404);
+    console.error(err);
+    return c.json({ error: "Could not load the circle" }, 500);
+  }
+});
+
+// The approval gate: the organizer's button, never the model, reaches the payout call.
+app.post("/api/circles/:circleId/payouts/:pendingId/approve", async (c) => {
+  const { circleId, pendingId } = c.req.param();
+  if (!uuid.safeParse(circleId).success || !uuid.safeParse(pendingId).success) {
+    return c.json({ ok: false, reason: "This payout is not waiting for approval" }, 404);
+  }
+
+  try {
+    const result = await approvePayout({ store, paypal: getPayPal() }, circleId, pendingId);
+    return c.json(result, result.ok ? 200 : 409);
+  } catch (err) {
+    console.error(err);
+    return c.json({ ok: false, reason: "Something went wrong; check the activity log before trying again" }, 500);
   }
 });
 

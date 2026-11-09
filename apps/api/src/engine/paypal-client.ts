@@ -116,7 +116,8 @@ export class PayPalClient {
             receiver: input.receiverEmail,
             amount: { value: centsToUsdString(input.amountCents), currency: "USD" },
             note: input.note,
-            sender_item_id: `${input.senderBatchId}-1`,
+            // PayPal caps this at 63 characters; the batch id already identifies the payout.
+            sender_item_id: "pot",
           },
         ],
       },

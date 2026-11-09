@@ -134,9 +134,13 @@ export async function sendMemberInvoicesAction(deps: AgentDeps, input: z.infer<t
       paypalInvoiceId: invoiceId,
       status: "sent",
     });
-  }
-  if (plan.length > 0) {
-    await deps.store.audit(circleId, "agent", "invoices_sent", { month: turn.monthIndex, count: plan.length });
+    await deps.store.audit(circleId, "agent", "invoice_sent", {
+      month: turn.monthIndex,
+      member: item.name,
+      amountCents: item.amountCents,
+      source: item.source,
+      paypalInvoiceId: invoiceId,
+    });
   }
 
   return {

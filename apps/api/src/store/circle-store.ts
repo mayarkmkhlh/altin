@@ -175,6 +175,106 @@ export class CircleStore {
     return { id: existing[0]!.id, created: false };
   }
 
+  async listPendingPayouts(circleId: string): Promise<{ id: string; monthIndex: number; payout: Payout }[]> {
+    const { rows } = await this.db.query<{ id: string; month_index: number; payload: Payout }>(
+      `select p.id, t.month_index, p.payload from pending_actions p join turns t on t.id = p.turn_id
+       where p.circle_id = $1 and p.kind = 'payout' and p.status = 'pending'
+       order by p.created_at`,
+      [circleId],
+    );
+    return rows.map((row) => ({ id: row.id, monthIndex: row.month_index, payout: row.payload }));
+  }
+
+  // The status check in the where clause is the guard: of two simultaneous approvals, only one gets a row back.
+  async claimPendingPayout(circleId: string, id: string): Promise<{ monthIndex: number; payout: Payout } | null> {
+    const { rows } = await this.db.query<{ month_index: number; payload: Payout }>(
+      `update pending_actions p set status = 'approved', decided_at = now()
+       from turns t
+       where p.id = $1 and p.circle_id = $2 and p.kind = 'payout' and p.status = 'pending' and t.id = p.turn_id
+       returning t.month_index, p.payload`,
+      [id, circleId],
+    );
+    const row = rows[0];
+    return row ? { monthIndex: row.month_index, payout: row.payload } : null;
+  }
+
+  async finishPendingAction(id: string, status: "executed" | "failed"): Promise<void> {
+    await this.db.query("update pending_actions set status = $2, executed_at = now() where id = $1", [id, status]);
+  }
+
+  async startRelease(circleId: string, monthIndex: number, payout: Payout): Promise<boolean> {
+    const { rows } = await this.db.query(
+      `update turns set status = 'releasing', sender_batch_id = $3, payout_amount_cents = $4
+       where circle_id = $1 and month_index = $2 and status = 'pot_complete'
+       returning id`,
+      [circleId, monthIndex, payout.senderBatchId, payout.amountCents],
+    );
+    return rows.length === 1;
+  }
+
+  async recordPayoutBatch(circleId: string, monthIndex: number, payoutBatchId: string): Promise<void> {
+    await this.db.query("update turns set payout_batch_id = $3 where circle_id = $1 and month_index = $2", [
+      circleId,
+      monthIndex,
+      payoutBatchId,
+    ]);
+  }
+
+  async releasingPayouts(circleId: string): Promise<{ monthIndex: number; payoutBatchId: string }[]> {
+    const { rows } = await this.db.query<{ month_index: number; payout_batch_id: string }>(
+      `select month_index, payout_batch_id from turns
+       where circle_id = $1 and status = 'releasing' and payout_batch_id is not null
+       order by month_index`,
+      [circleId],
+    );
+    return rows.map((row) => ({ monthIndex: row.month_index, payoutBatchId: row.payout_batch_id }));
+  }
+
+  // Mirrors the engine's markReleased: the next upcoming gathering starts collecting, or the circle completes.
+  async markReleased(circleId: string, monthIndex: number): Promise<{ released: boolean; nextMonth: number | null }> {
+    return this.db.transaction(async (tx) => {
+      const { rows } = await tx.query(
+        `update turns set status = 'released', paid_out_at = now()
+         where circle_id = $1 and month_index = $2 and status = 'releasing'
+         returning id`,
+        [circleId, monthIndex],
+      );
+      if (rows.length === 0) return { released: false, nextMonth: null };
+
+      const { rows: next } = await tx.query<{ month_index: number }>(
+        `update turns set status = 'collecting'
+         where id = (select id from turns where circle_id = $1 and status = 'upcoming' order by month_index limit 1)
+         returning month_index`,
+        [circleId],
+      );
+      if (next[0]) return { released: true, nextMonth: next[0].month_index };
+
+      await tx.query("update circles set status = 'completed' where id = $1", [circleId]);
+      return { released: true, nextMonth: null };
+    });
+  }
+
+  async listAudit(
+    circleId: string,
+  ): Promise<{ id: number; actor: AuditActor; action: string; details: Record<string, unknown>; at: string }[]> {
+    const { rows } = await this.db.query<{
+      id: number;
+      actor: AuditActor;
+      action: string;
+      details: Record<string, unknown>;
+      created_at: Date | string;
+    }>("select id, actor, action, details, created_at from audit where circle_id = $1 order by id desc limit 200", [
+      circleId,
+    ]);
+    return rows.map((row) => ({
+      id: Number(row.id),
+      actor: row.actor,
+      action: row.action,
+      details: row.details,
+      at: new Date(row.created_at).toISOString(),
+    }));
+  }
+
   async audit(circleId: string, actor: AuditActor, action: string, details: Record<string, unknown>): Promise<void> {
     await this.db.query("insert into audit (circle_id, actor, action, details) values ($1, $2, $3, $4)", [
       circleId,

@@ -41,3 +41,10 @@
 - The model passes amounts as said ("1000", SAR); code converts to USD cents, so the model never does money arithmetic.
 - Tool inputs are Zod schemas, so a bad call (one member, negative amount) is rejected before any code runs.
 - Muse Spark through the Vercel AI SDK's OpenAI-compatible provider, with the same env names as Sijil.
+
+## Approval gate and audit log (t051)
+- One Approve call per payout (council cut): no batching and no retry button. A PayPal error is logged and left for a person.
+- Approving flips the pending row with a conditional update, so two taps at once still make one payout call.
+- Before paying, the server recomputes the payout from the current invoices and refuses if it differs from the proposal.
+- A gathering is released only when a GET says the batch is SUCCESS; the item-level UNCLAIMED check is still to do.
+- Every agent action, failed tool call, PayPal call and approval is an audit row, shown newest first on the circle page.

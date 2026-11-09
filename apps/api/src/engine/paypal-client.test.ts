@@ -124,6 +124,23 @@ test("createPayout uses the business-event sender_batch_id and the summed amount
   assert.equal(body.items[0].receiver, "layla@example.com");
 });
 
+test("createPayout stays within PayPal's id length limits for real circle ids", async () => {
+  const paypal = fakePayPal({
+    "POST /v1/payments/payouts": { batch_header: { payout_batch_id: "BATCH-1", batch_status: "PENDING" } },
+  });
+
+  await paypal.client.createPayout({
+    senderBatchId: `altin-${crypto.randomUUID()}-m12-${crypto.randomUUID()}`,
+    receiverEmail: "layla@example.com",
+    amountCents: 5005,
+    note: "Your gathering pot",
+  });
+
+  const body = paypal.calls.at(-1)!.body as any;
+  assert.ok(body.sender_batch_header.sender_batch_id.length <= 256);
+  assert.ok(body.items[0].sender_item_id.length <= 63);
+});
+
 test("errors include PayPal's status and message", async () => {
   const paypal = fakePayPal({}, { failWith: [403, '{"name":"NOT_AUTHORIZED"}'] });
   await assert.rejects(paypal.client.sendInvoice("INV-1"), /403.*NOT_AUTHORIZED/);

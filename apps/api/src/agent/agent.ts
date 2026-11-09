@@ -33,20 +33,41 @@ export function createTools(deps: AgentDeps) {
     create_circle: tool({
       description: "Create the savings circle and its rotation from the organizer's description.",
       inputSchema: createCircleInput,
-      execute: (input) => createCircleAction(deps, input),
+      execute: audited(deps, "create_circle", (input: z.infer<typeof createCircleInput>) =>
+        createCircleAction(deps, input),
+      ),
     }),
     send_member_invoices: tool({
       description:
         "Send this gathering's PayPal invoices to every member except the host. Amounts come from what the organizer stated, then the payback suggestion, then the usual amount.",
       inputSchema: sendMemberInvoicesInput,
-      execute: (input) => sendMemberInvoicesAction(deps, input),
+      execute: audited(deps, "send_member_invoices", (input: z.infer<typeof sendMemberInvoicesInput>) =>
+        sendMemberInvoicesAction(deps, input),
+      ),
     }),
     propose_payout: tool({
       description:
         "When every invoice for this gathering is paid or closed, ask the organizer to approve releasing the pot to the host. Does not move money.",
       inputSchema: z.object({}),
-      execute: () => proposePayoutAction(deps),
+      execute: audited(deps, "propose_payout", () => proposePayoutAction(deps)),
     }),
+  };
+}
+
+// Successful actions write their own audit entries; this records the attempts that failed.
+function audited<I, O>(deps: AgentDeps, toolName: string, run: (input: I) => Promise<O>) {
+  return async (input: I): Promise<O> => {
+    try {
+      return await run(input);
+    } catch (err) {
+      if (deps.session.circleId) {
+        await deps.store.audit(deps.session.circleId, "agent", "tool_failed", {
+          tool: toolName,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      throw err;
+    }
   };
 }
 

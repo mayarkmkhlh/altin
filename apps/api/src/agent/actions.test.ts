@@ -199,3 +199,20 @@ test("propose_payout writes one pending row for the organizer and calls no PayPa
   );
   assert.deepEqual(rows, [{ kind: "payout", status: "pending", amount: 20050 }]);
 });
+
+test("every invoice the agent sends gets its own audit entry", async () => {
+  const { db, deps } = await setup();
+  const { circleId } = await createCircleAction(deps, sisterFirst);
+  await sendMemberInvoicesAction(deps, {});
+
+  const { rows } = await db.query<{ action: string; member: string; invoice: string }>(
+    `select action, details->>'member' as member, details->>'paypalInvoiceId' as invoice
+     from audit where circle_id = $1 order by id`,
+    [circleId],
+  );
+  assert.deepEqual(rows, [
+    { action: "circle_created", member: null, invoice: null },
+    { action: "invoice_sent", member: "Layla", invoice: "INV-1" },
+    { action: "invoice_sent", member: "Noor", invoice: "INV-2" },
+  ]);
+});

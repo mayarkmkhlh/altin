@@ -18,8 +18,8 @@ Requires Node 22+ and a Postgres database.
 
 ```bash
 npm install
-cp .env.example .env   # fill in DATABASE_URL and the PayPal sandbox keys
-npm run migrate -w apps/api
+cp .env.example .env.local   # fill in DATABASE_URL and the PayPal sandbox keys
+npx tsx --env-file=.env.local apps/api/src/migrate.ts
 npm run dev:api        # http://localhost:3000
 npm run dev:web        # http://localhost:5173
 ```

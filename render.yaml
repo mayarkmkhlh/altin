@@ -1,10 +1,3 @@
-databases:
-  - name: altin-db
-    databaseName: altin
-    user: altin
-    plan: free
-    region: virginia
-
 services:
   - type: web
     name: altin
@@ -16,9 +9,7 @@ services:
     healthCheckPath: /api/health
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: altin-db
-          property: connectionString
+        sync: false
       - key: PAYPAL_CLIENT_ID
         sync: false
       - key: PAYPAL_CLIENT_SECRET

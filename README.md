@@ -26,7 +26,7 @@ npm run dev:web        # http://localhost:5173
 
 ## Deploy
 
-`render.yaml` is a Render Blueprint that creates the Postgres database and the web service.
+`render.yaml` is a Render Blueprint for the web service. The Postgres database is hosted on Neon; Render asks for its `DATABASE_URL` when the Blueprint syncs.
 
 ## License
 

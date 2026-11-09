@@ -1,0 +1,33 @@
+# Altın
+
+**Sandbox demo only. No real money moves.**
+
+Altın ("gold" in Turkish) is an AI treasurer for rotating savings circles: altın günü, jam'iya, tanda, susu, chit funds. It builds the rotation, invoices members through PayPal, tracks the pot, and asks the organizer to approve each payout.
+
+Built for the PayPal AI Hackathon with PayPal Invoicing, Payouts and Webhooks (sandbox).
+
+## Structure
+
+- `apps/web`: React + TypeScript (Vite)
+- `apps/api`: Node + TypeScript (Hono), Postgres; also serves the built web app
+- `apps/api/migrations`: numbered SQL migrations, applied on every start
+
+## Run locally
+
+Requires Node 22+ and a Postgres database.
+
+```bash
+npm install
+cp .env.example .env   # fill in DATABASE_URL and the PayPal sandbox keys
+npm run migrate -w apps/api
+npm run dev:api        # http://localhost:3000
+npm run dev:web        # http://localhost:5173
+```
+
+## Deploy
+
+`render.yaml` is a Render Blueprint that creates the Postgres database and the web service.
+
+## License
+
+MIT

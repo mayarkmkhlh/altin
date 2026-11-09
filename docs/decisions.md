@@ -1,0 +1,36 @@
+# Decisions
+
+## Spike 1: invoices (t044, t091)
+- An invoice moves DRAFT → SENT → PAID; only a GET that says PAID counts as paid.
+- The 403 on first create was a missing Invoicing feature on the app, found by reading the token's `scope`.
+- Saudi sandbox accounts can invoice and pay in USD; no US accounts needed.
+- The sandbox pay page can hang after paying; trust the API status, not the browser.
+- Each run fetches a fresh token; client credentials have no refresh step.
+
+## Spike 2: payouts (t045)
+- Payouts are async: PENDING → PROCESSING → SUCCESS in about 30 seconds, so the UI polls and shows progress.
+- `sender_batch_id` is built from circle + month + recipient; PayPal rejects a repeat, so a double click can't pay twice.
+- Check the recipient's item status as well as the batch status (an item can be UNCLAIMED).
+- Payouts was already enabled on the sandbox app; no extra setup.
+- Polling has a limit so a stuck batch can't hang the request.
+
+## Spike 3: webhooks on Render (t046)
+- PayPal pushes INVOICING.INVOICE.PAID about 14 seconds after payment; no polling fallback needed for the demo.
+- Every webhook is checked with PayPal's verify endpoint; unsigned or forged requests get a 400.
+- Repeat deliveries are ignored by event id (in Postgres in the real app, not memory).
+- The handler answers 200 first, then confirms the invoice with a GET.
+- Free Render instances sleep; wake the app before filming.
+
+## Scaffold (t048)
+- One Render service serves both the API and the built React app: one URL, no CORS.
+- Postgres is on Neon (free, no expiry) because Render's single free database slot is used by Sijil.
+- Migrations are numbered SQL files applied on every start and recorded in `schema_migrations`.
+- Money is integer US cents everywhere; SAR is a display label at 3.75.
+- The database enforces the rules too: one invoice per member per gathering, fixed status lists, USD only.
+
+## Circle engine (t049)
+- No fixed contribution: each invoice is that member's own pledge, and the payout is the sum of paid invoices.
+- A pot is complete when every invoice is paid or closed and at least one is paid; partial payment blocks it.
+- `releasing` sits between approval and PayPal's SUCCESS, because payouts take about 30 seconds.
+- The payback suggestion is what the host gave at the giver's own gathering; it is only a default and stays editable.
+- The engine is pure functions with no database or network, so every state change is tested in milliseconds.

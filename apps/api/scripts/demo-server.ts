@@ -116,7 +116,14 @@ const app = createApp({
     async getPayoutStatus(batchId) {
       return Date.now() - (payoutStartedAt.get(batchId) ?? 0) > 8000 ? "SUCCESS" : "PENDING";
     },
+    async verifyWebhookSignature() {
+      return false;
+    },
+    async getInvoiceStatus() {
+      return "sent";
+    },
   }),
+  webhookId: undefined,
   model: museSparkModel,
   organizerEmail: "organizer@altin.example",
   listTables: async () => ["demo"],

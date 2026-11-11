@@ -39,6 +39,11 @@ export type InvoiceDetail = {
   paidAt: string | null;
 };
 
+export type InvoicePaidResult =
+  | { kind: "duplicate" }
+  | { kind: "not_open" }
+  | { kind: "paid"; circleId: string; member: string; monthIndex: number; potComplete: boolean };
+
 export type PendingPayout = { id: string; monthIndex: number; payout: Payout; proposedAt: string };
 
 const isoOrNull = (value: Date | string | null) => (value === null ? null : new Date(value).toISOString());
@@ -324,6 +329,54 @@ export class CircleStore {
 
       await tx.query("update circles set status = 'completed' where id = $1", [circleId]);
       return { released: true, nextMonth: null };
+    });
+  }
+
+  // One transaction: if anything fails the event id isn't kept, so PayPal's retry gets a clean second try.
+  async recordInvoicePaid(event: { eventId: string; eventType: string; paypalInvoiceId: string }): Promise<InvoicePaidResult> {
+    return this.db.transaction(async (tx) => {
+      const { rows: fresh } = await tx.query(
+        `insert into webhook_events (paypal_event_id, event_type) values ($1, $2)
+         on conflict (paypal_event_id) do nothing returning paypal_event_id`,
+        [event.eventId, event.eventType],
+      );
+      if (fresh.length === 0) return { kind: "duplicate" };
+
+      const { rows } = await tx.query<{
+        circle_id: string;
+        turn_id: string;
+        month_index: number;
+        display_name: string;
+        amount_cents: number;
+      }>(
+        `update invoices i set status = 'paid', paid_at = now()
+         from turns t, members m
+         where i.paypal_invoice_id = $1 and i.status = 'sent'
+           and t.id = i.turn_id and m.id = i.member_id
+         returning i.circle_id, i.turn_id, t.month_index, m.display_name, i.amount_cents`,
+        [event.paypalInvoiceId],
+      );
+      const paid = rows[0];
+      if (!paid) return { kind: "not_open" };
+
+      const { rows: completed } = await tx.query(
+        `update turns set status = 'pot_complete'
+         where id = $1 and status = 'collecting'
+           and not exists (select 1 from invoices where turn_id = $1 and status not in ('paid', 'cancelled'))
+         returning id`,
+        [paid.turn_id],
+      );
+      await tx.query("insert into audit (circle_id, actor, action, details) values ($1, 'paypal', 'invoice_paid', $2)", [
+        paid.circle_id,
+        JSON.stringify({ month: paid.month_index, member: paid.display_name, amountCents: paid.amount_cents, paypalInvoiceId: event.paypalInvoiceId }),
+      ]);
+      return {
+        kind: "paid",
+        circleId: paid.circle_id,
+        member: paid.display_name,
+        monthIndex: paid.month_index,
+        potComplete: completed.length > 0,
+      };
     });
   }
 

@@ -18,6 +18,7 @@ const app = createApp({
   paypal: () => (paypal ??= PayPalClient.fromEnv()),
   model: museSparkModel,
   organizerEmail: process.env.ORGANIZER_EMAIL ?? "organizer@altin.example",
+  webhookId: process.env.PAYPAL_WEBHOOK_ID,
   listTables: async () => {
     const { rows } = await pool.query<{ table_name: string }>(
       "select table_name from information_schema.tables where table_schema = 'public' order by table_name",

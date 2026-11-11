@@ -7,13 +7,18 @@ import { circleView } from "./circle-view";
 import type { PayPalClient } from "./engine/paypal-client";
 import { approvePayout, checkReleasingPayouts } from "./payouts/approval";
 import type { CircleStore } from "./store/circle-store";
+import { handlePayPalWebhook } from "./webhooks/paypal-webhook";
 
 // The demo URL is public and every agent call spends model credits.
 const AGENT_CALLS_PER_HOUR = 60;
 
 export type AppDeps = {
   store: CircleStore;
-  paypal: () => Pick<PayPalClient, "createInvoice" | "sendInvoice" | "createPayout" | "getPayoutStatus">;
+  paypal: () => Pick<
+    PayPalClient,
+    "createInvoice" | "sendInvoice" | "createPayout" | "getPayoutStatus" | "verifyWebhookSignature" | "getInvoiceStatus"
+  >;
+  webhookId: string | undefined;
   model: () => LanguageModel;
   organizerEmail: string;
   listTables: () => Promise<string[]>;
@@ -105,6 +110,28 @@ export function createApp(deps: AppDeps): Hono {
     } catch (err) {
       console.error(err);
       return c.json({ ok: false, reason: "Something went wrong; check the activity log before trying again" }, 500);
+    }
+  });
+
+  app.post("/webhooks/paypal", async (c) => {
+    try {
+      const result = await handlePayPalWebhook(
+        { store, paypal: deps.paypal(), webhookId: deps.webhookId },
+        {
+          rawBody: await c.req.text(),
+          headers: {
+            authAlgo: c.req.header("paypal-auth-algo"),
+            certUrl: c.req.header("paypal-cert-url"),
+            transmissionId: c.req.header("paypal-transmission-id"),
+            transmissionSig: c.req.header("paypal-transmission-sig"),
+            transmissionTime: c.req.header("paypal-transmission-time"),
+          },
+        },
+      );
+      return c.text(result.body, result.status);
+    } catch (err) {
+      console.error(err);
+      return c.text("error", 500);
     }
   });
 

@@ -3,6 +3,7 @@ import { getJson, HttpError } from "../../lib/http/http";
 import type { CircleView } from "../../lib/types/circle-view.type";
 
 const PAYING_POLL_MS = 5000;
+const PAYMENTS_POLL_MS = 10_000;
 
 export type CircleState =
   | { status: "none" }
@@ -29,12 +30,16 @@ export function useCircle(circleId: string | null): { state: CircleState; refres
   }, [circleId, refresh]);
 
   // A payout is only final when PayPal confirms it, so keep asking while one is in flight.
-  const paying = state.status === "ready" && state.circle.gatherings.some((g) => g.status === "releasing");
+  // Payments arrive by webhook on the server, so the board also checks in while invoices are still open.
+  const gatherings = state.status === "ready" ? state.circle.gatherings : [];
+  const paying = gatherings.some((g) => g.status === "releasing");
+  const awaitingPayments = gatherings.some((g) => g.status === "collecting" && g.paidCount < g.invoiceCount);
+  const pollMs = paying ? PAYING_POLL_MS : awaitingPayments ? PAYMENTS_POLL_MS : null;
   useEffect(() => {
-    if (!paying) return;
-    const timer = setInterval(() => void refresh(), PAYING_POLL_MS);
+    if (pollMs === null) return;
+    const timer = setInterval(() => void refresh(), pollMs);
     return () => clearInterval(timer);
-  }, [paying, refresh]);
+  }, [pollMs, refresh]);
 
   return { state, refresh };
 }

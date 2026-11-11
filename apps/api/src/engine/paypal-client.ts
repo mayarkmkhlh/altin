@@ -9,6 +9,14 @@ export type PayPalConfig = {
   now?: () => number;
 };
 
+export type WebhookSignatureHeaders = {
+  authAlgo: string;
+  certUrl: string;
+  transmissionId: string;
+  transmissionSig: string;
+  transmissionTime: string;
+};
+
 // Refresh a minute early so a token never expires in the middle of a request.
 const TOKEN_REFRESH_MARGIN_MS = 60_000;
 
@@ -133,6 +141,26 @@ export class PayPalClient {
     return batch.batch_header.batch_status;
   }
 
+  // PayPal checks the event byte for byte, so the raw body is spliced in rather than parsed and re-serialized.
+  async verifyWebhookSignature(input: {
+    webhookId: string;
+    headers: WebhookSignatureHeaders;
+    rawBody: string;
+  }): Promise<boolean> {
+    const { headers } = input;
+    const fields = JSON.stringify({
+      auth_algo: headers.authAlgo,
+      cert_url: headers.certUrl,
+      transmission_id: headers.transmissionId,
+      transmission_sig: headers.transmissionSig,
+      transmission_time: headers.transmissionTime,
+      webhook_id: input.webhookId,
+    });
+    const body = `${fields.slice(0, -1)},"webhook_event":${input.rawBody}}`;
+    const result = await this.send<{ verification_status: string }>("POST", "/v1/notifications/verify-webhook-signature", body);
+    return result.verification_status === "SUCCESS";
+  }
+
   private async getToken(): Promise<string> {
     const now = this.now();
     if (this.token && now < this.token.expiresAt) return this.token.value;
@@ -150,12 +178,16 @@ export class PayPalClient {
     return this.token.value;
   }
 
-  private async request<T = unknown>(
+  private request<T = unknown>(
     method: string,
     path: string,
     body?: unknown,
     headers: Record<string, string> = {},
   ): Promise<T> {
+    return this.send<T>(method, path, body === undefined ? undefined : JSON.stringify(body), headers);
+  }
+
+  private async send<T>(method: string, path: string, body: string | undefined, headers: Record<string, string> = {}): Promise<T> {
     const res = await this.fetch(`${this.config.baseUrl}${path}`, {
       method,
       headers: {
@@ -163,7 +195,7 @@ export class PayPalClient {
         "Content-Type": "application/json",
         ...headers,
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body,
     });
     if (!res.ok) throw new Error(`PayPal ${method} ${path} failed: ${res.status} ${await res.text()}`);
 

@@ -65,3 +65,7 @@
 - A PAID event counts only after a GET says PAID; otherwise we answer 500 and wait for the redelivery.
 - Tested with a real sandbox checkout, not the simulator (its events can't pass verification).
 - The board polls every 10 seconds while invoices are open, so a payment shows up without reloading.
+
+## CI (t092)
+- GitHub Actions on every push and pull request: npm ci, typecheck, tests, web build, on Node 22 (the version Render runs).
+- Tests need no secrets: they use PGlite in memory and fake PayPal clients, so CI never touches the sandbox or Neon.

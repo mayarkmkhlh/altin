@@ -1,5 +1,7 @@
 # Altın
 
+[![CI](https://github.com/mayarkmkhlh/altin/actions/workflows/ci.yml/badge.svg)](https://github.com/mayarkmkhlh/altin/actions/workflows/ci.yml)
+
 **Sandbox demo only. No real money moves.**
 
 Altın ("gold" in Turkish) is an AI treasurer for rotating savings circles: altın günü, jam'iya, tanda, susu, chit funds. It builds the rotation, invoices members through PayPal, tracks the pot, and asks the organizer to approve each payout.

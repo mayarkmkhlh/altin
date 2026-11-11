@@ -171,6 +171,11 @@ test("the gathering is released only once PayPal reports the batch as SUCCESS", 
   assert.deepEqual(await turnStatuses(db, circleId), ["released", "collecting", "upcoming"]);
   const actions = await auditActions(db, circleId);
   assert.equal(actions.filter((action) => action === "paypal:payout_succeeded").length, 1);
+  const { rows } = await db.query<{ details: { amountCents: number } }>(
+    "select details from audit where circle_id = $1 and action = 'payout_succeeded'",
+    [circleId],
+  );
+  assert.equal(rows[0]!.details.amountCents, paypal.payouts[0]!.amountCents);
 });
 
 test("releasing the last gathering completes the circle", async () => {

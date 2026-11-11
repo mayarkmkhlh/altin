@@ -48,3 +48,11 @@
 - Before paying, the server recomputes the payout from the current invoices and refuses if it differs from the proposal.
 - A gathering is released only when a GET says the batch is SUCCESS; the item-level UNCLAIMED check is still to do.
 - Every agent action, failed tool call, PayPal call and approval is an audit row, shown newest first on the circle page.
+
+## React UI (t052)
+- Four tabs (Circle, Assistant, Approvals, Activity) on one circle; no circle list (council cap: one circle screen).
+- Sijil-style layout: shared components in components/, one folder per feature in modules/, hooks, and all EN/AR text in one copy file.
+- Plain CSS with logical properties, so Arabic RTL comes from dir on <html>; chat bubbles use dir="auto" for mixed text.
+- One read endpoint (GET /api/circles/:id) returns the whole board; the page polls only while a payout is confirming.
+- The approval card shows the payout and who gave what; the Approve button is the only path to Payouts.
+- No auth yet: the circle id in the URL is the key. Receiver emails are masked in the view.

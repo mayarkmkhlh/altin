@@ -77,13 +77,13 @@ export async function approvePayout(deps: PayoutDeps, circleId: string, pendingA
 
 // A gathering counts as paid out only when a GET to PayPal says the batch succeeded.
 export async function checkReleasingPayouts(deps: PayoutDeps, circleId: string): Promise<void> {
-  for (const { monthIndex, payoutBatchId } of await deps.store.releasingPayouts(circleId)) {
+  for (const { monthIndex, payoutBatchId, amountCents } of await deps.store.releasingPayouts(circleId)) {
     const status = await deps.paypal.getPayoutStatus(payoutBatchId);
     if (status !== "SUCCESS") continue;
 
     const { released, nextMonth } = await deps.store.markReleased(circleId, monthIndex);
     if (!released) continue;
-    await deps.store.audit(circleId, "paypal", "payout_succeeded", { month: monthIndex, payoutBatchId });
+    await deps.store.audit(circleId, "paypal", "payout_succeeded", { month: monthIndex, payoutBatchId, amountCents });
     await deps.store.audit(
       circleId,
       "system",

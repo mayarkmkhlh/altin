@@ -1,9 +1,10 @@
 import { z } from "zod";
+import { addMonths } from "../engine/calendar";
 import { addInvoice, approveRelease, currentTurn, potTotalCents } from "../engine/circle";
 import { paybackSuggestion } from "../engine/ledger";
 import { centsToUsdString, sarLabel, toUsdCents } from "../engine/money";
 import type { PayPalClient } from "../engine/paypal-client";
-import type { CircleStore } from "../store/circle-store";
+import type { AmountSource, CircleStore } from "../store/circle-store";
 
 export type AgentDeps = {
   store: CircleStore;
@@ -93,7 +94,7 @@ export async function sendMemberInvoicesAction(deps: AgentDeps, input: z.infer<t
   }
 
   let circle = record.circle;
-  const plan: { memberId: string; name: string; email: string; amountCents: number; source: string }[] = [];
+  const plan: { memberId: string; name: string; email: string; amountCents: number; source: AmountSource }[] = [];
   const alreadyInvoiced: string[] = [];
   const needsAmount: string[] = [];
 
@@ -104,7 +105,7 @@ export async function sendMemberInvoicesAction(deps: AgentDeps, input: z.infer<t
       continue;
     }
     const payback = paybackSuggestion(circle, member.id, host.id);
-    const [amountCents, source] = stated.has(member.id)
+    const [amountCents, source]: [number, AmountSource] | [null, null] = stated.has(member.id)
       ? [stated.get(member.id)!, "organizer"]
       : payback !== null
         ? [payback, "payback"]
@@ -133,6 +134,7 @@ export async function sendMemberInvoicesAction(deps: AgentDeps, input: z.infer<t
       amountCents: item.amountCents,
       paypalInvoiceId: invoiceId,
       status: "sent",
+      amountSource: item.source,
     });
     await deps.store.audit(circleId, "agent", "invoice_sent", {
       month: turn.monthIndex,
@@ -226,10 +228,4 @@ function requireCircleId(deps: AgentDeps): string {
 
 function normalize(name: string): string {
   return name.trim().toLocaleLowerCase();
-}
-
-function addMonths(yearMonth: string, months: number): string {
-  const [year, month] = yearMonth.split("-").map(Number) as [number, number];
-  const date = new Date(Date.UTC(year, month - 1 + months, 1));
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
 }

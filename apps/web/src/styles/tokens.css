@@ -1,0 +1,30 @@
+/* Altın colours: a dark green-black workspace with gold for money and the one action that matters. */
+:root {
+  --color-bg: #0e1311;
+  --color-bg-raised: #161d1a;
+  --color-bg-sunken: #0a0e0c;
+  --color-ink: #f3efe6;
+  --color-ink-soft: #b9b4a8;
+  --color-ink-faint: #7f7b72;
+  --color-line: rgba(243, 239, 230, 0.09);
+  --color-line-strong: rgba(243, 239, 230, 0.16);
+  --color-gold: #d4ae62;
+  --color-gold-ink: #1f1806;
+  --color-gold-soft: rgba(212, 174, 98, 0.14);
+  --color-ok: #7fd19b;
+  --color-ok-soft: rgba(127, 209, 155, 0.12);
+  --color-warn: #e8a54b;
+  --color-warn-soft: rgba(232, 165, 75, 0.12);
+  --color-danger: #e98a78;
+  --color-danger-soft: rgba(233, 138, 120, 0.12);
+  --color-paypal: #1d2b44;
+  --color-paypal-ink: #9cc0ff;
+  --font: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+  --font-display: "Instrument Serif", "IBM Plex Sans Arabic", Georgia, serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --radius: 1.1rem;
+  --radius-small: 0.75rem;
+  --page-width: 30rem;
+  --tab-bar-height: 4.25rem;
+  color-scheme: dark;
+}

@@ -28,6 +28,21 @@ export type NewCircle = {
 
 export type AuditActor = "organizer" | "agent" | "paypal" | "system";
 
+export type AmountSource = "organizer" | "payback" | "usual";
+
+export type InvoiceDetail = {
+  monthIndex: number;
+  memberId: string;
+  amountCents: number;
+  status: InvoiceStatus;
+  amountSource: AmountSource | null;
+  paidAt: string | null;
+};
+
+export type PendingPayout = { id: string; monthIndex: number; payout: Payout; proposedAt: string };
+
+const isoOrNull = (value: Date | string | null) => (value === null ? null : new Date(value).toISOString());
+
 export class CircleStore {
   constructor(private readonly db: Db) {}
 
@@ -144,14 +159,53 @@ export class CircleStore {
   async saveInvoice(
     circleId: string,
     monthIndex: number,
-    invoice: { memberId: string; amountCents: number; paypalInvoiceId: string; status: InvoiceStatus },
+    invoice: {
+      memberId: string;
+      amountCents: number;
+      paypalInvoiceId: string;
+      status: InvoiceStatus;
+      amountSource?: AmountSource;
+    },
   ): Promise<void> {
     await this.db.query(
-      `insert into invoices (circle_id, turn_id, member_id, amount_cents, paypal_invoice_id, status)
-       select $1, t.id, $3, $4, $5, $6 from turns t where t.circle_id = $1 and t.month_index = $2
+      `insert into invoices (circle_id, turn_id, member_id, amount_cents, paypal_invoice_id, status, amount_source)
+       select $1, t.id, $3, $4, $5, $6, $7 from turns t where t.circle_id = $1 and t.month_index = $2
        on conflict (turn_id, member_id) do nothing`,
-      [circleId, monthIndex, invoice.memberId, invoice.amountCents, invoice.paypalInvoiceId, invoice.status],
+      [
+        circleId,
+        monthIndex,
+        invoice.memberId,
+        invoice.amountCents,
+        invoice.paypalInvoiceId,
+        invoice.status,
+        invoice.amountSource ?? null,
+      ],
     );
+  }
+
+  async listInvoiceDetails(circleId: string): Promise<InvoiceDetail[]> {
+    const { rows } = await this.db.query<{
+      month_index: number;
+      member_id: string;
+      amount_cents: number;
+      status: InvoiceStatus;
+      amount_source: AmountSource | null;
+      paid_at: Date | string | null;
+    }>(
+      `select t.month_index, i.member_id, i.amount_cents, i.status, i.amount_source, i.paid_at
+       from invoices i join turns t on t.id = i.turn_id
+       where i.circle_id = $1
+       order by t.month_index, i.created_at, i.id`,
+      [circleId],
+    );
+    return rows.map((row) => ({
+      monthIndex: row.month_index,
+      memberId: row.member_id,
+      amountCents: row.amount_cents,
+      status: row.status,
+      amountSource: row.amount_source,
+      paidAt: isoOrNull(row.paid_at),
+    }));
   }
 
   async createPendingPayout(
@@ -175,14 +229,24 @@ export class CircleStore {
     return { id: existing[0]!.id, created: false };
   }
 
-  async listPendingPayouts(circleId: string): Promise<{ id: string; monthIndex: number; payout: Payout }[]> {
-    const { rows } = await this.db.query<{ id: string; month_index: number; payload: Payout }>(
-      `select p.id, t.month_index, p.payload from pending_actions p join turns t on t.id = p.turn_id
+  async listPendingPayouts(circleId: string): Promise<PendingPayout[]> {
+    const { rows } = await this.db.query<{
+      id: string;
+      month_index: number;
+      payload: Payout;
+      created_at: Date | string;
+    }>(
+      `select p.id, t.month_index, p.payload, p.created_at from pending_actions p join turns t on t.id = p.turn_id
        where p.circle_id = $1 and p.kind = 'payout' and p.status = 'pending'
        order by p.created_at`,
       [circleId],
     );
-    return rows.map((row) => ({ id: row.id, monthIndex: row.month_index, payout: row.payload }));
+    return rows.map((row) => ({
+      id: row.id,
+      monthIndex: row.month_index,
+      payout: row.payload,
+      proposedAt: new Date(row.created_at).toISOString(),
+    }));
   }
 
   // The status check in the where clause is the guard: of two simultaneous approvals, only one gets a row back.
@@ -220,14 +284,23 @@ export class CircleStore {
     ]);
   }
 
-  async releasingPayouts(circleId: string): Promise<{ monthIndex: number; payoutBatchId: string }[]> {
-    const { rows } = await this.db.query<{ month_index: number; payout_batch_id: string }>(
-      `select month_index, payout_batch_id from turns
-       where circle_id = $1 and status = 'releasing' and payout_batch_id is not null
-       order by month_index`,
+  async releasingPayouts(
+    circleId: string,
+  ): Promise<{ monthIndex: number; payoutBatchId: string; amountCents: number }[]> {
+    const { rows } = await this.db.query<{ month_index: number; payout_batch_id: string; amount_cents: string }>(
+      `select t.month_index, t.payout_batch_id,
+              (select coalesce(sum(i.amount_cents), 0) from invoices i
+                where i.turn_id = t.id and i.status = 'paid') as amount_cents
+       from turns t
+       where t.circle_id = $1 and t.status = 'releasing' and t.payout_batch_id is not null
+       order by t.month_index`,
       [circleId],
     );
-    return rows.map((row) => ({ monthIndex: row.month_index, payoutBatchId: row.payout_batch_id }));
+    return rows.map((row) => ({
+      monthIndex: row.month_index,
+      payoutBatchId: row.payout_batch_id,
+      amountCents: Number(row.amount_cents),
+    }));
   }
 
   // Mirrors the engine's markReleased: the next upcoming gathering starts collecting, or the circle completes.
@@ -263,7 +336,7 @@ export class CircleStore {
       action: string;
       details: Record<string, unknown>;
       created_at: Date | string;
-    }>("select id, actor, action, details, created_at from audit where circle_id = $1 order by id desc limit 200", [
+    }>("select id, actor, action, details, created_at from audit where circle_id = $1 order by created_at desc, id desc limit 200", [
       circleId,
     ]);
     return rows.map((row) => ({
@@ -271,7 +344,7 @@ export class CircleStore {
       actor: row.actor,
       action: row.action,
       details: row.details,
-      at: new Date(row.created_at).toISOString(),
+      at: isoOrNull(row.created_at)!,
     }));
   }
 

@@ -67,6 +67,15 @@
 - A resend of the same event through PayPal's resend API left one invoice_paid row.
 - The board polls every 10 seconds while invoices are open, so a payment shows up without reloading.
 
+## Demo circle, polish and PWA (t055)
+- One seed (scripts/demo-seed.ts) feeds both the local demo and Neon: ten fictional women, three paid-out gatherings, Hessa's payment still open.
+- On Neon, Hessa's invoice is a real sandbox invoice and Huda's email is a sandbox account, so the filmed payment and payout are real.
+- The local "pay next" button goes through the same store call as the real webhook.
+- Installable PWA: manifest, gold A icon (192, 512, maskable, 180 for iOS), standalone, #0e1311. No service worker: the app is useless offline and a cache could show stale money.
+- Installed on iOS the page draws under the status bar, so the top padding includes the safe area.
+- A failed background refresh keeps the last board instead of flashing an error mid-demo.
+- Avatars get a stable muted hue from the member's name.
+
 ## CI (t092)
 - GitHub Actions on every push and pull request: npm ci, typecheck, tests, web build, on Node 22, the minimum in package.json engines.
 - Tests need no secrets: they use PGlite in memory and fake PayPal clients, so CI never touches the sandbox or Neon.

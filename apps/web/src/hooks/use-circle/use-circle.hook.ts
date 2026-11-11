@@ -20,7 +20,9 @@ export function useCircle(circleId: string | null): { state: CircleState; refres
     try {
       setState({ status: "ready", circle: await getJson<CircleView>(`/api/circles/${circleId}`) });
     } catch (error) {
-      setState(error instanceof HttpError && error.status === 404 ? { status: "missing" } : { status: "error" });
+      if (error instanceof HttpError && error.status === 404) return setState({ status: "missing" });
+      // A background refresh that fails keeps the board it already has; only a first load shows the error.
+      setState((previous) => (previous.status === "ready" ? previous : { status: "error" }));
     }
   }, [circleId]);
 

@@ -58,7 +58,7 @@ dd {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-  padding: 1.5rem 1.25rem 2rem;
+  padding: calc(1.5rem + env(safe-area-inset-top)) 1.25rem 2rem;
 }
 
 .app.has-tabs .page {
@@ -241,8 +241,8 @@ dd {
 }
 
 .avatar-neutral {
-  background: #222b27;
-  color: var(--color-ink);
+  background: hsl(var(--avatar-hue, 150) 30% 24%);
+  color: hsl(var(--avatar-hue, 150) 60% 82%);
 }
 
 .avatar-gold {

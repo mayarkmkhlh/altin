@@ -56,3 +56,12 @@
 - One read endpoint (GET /api/circles/:id) returns the whole board; the page polls only while a payout is confirming.
 - The approval card shows the payout and who gave what; the Approve button is the only path to Payouts.
 - No auth yet: the circle id in the URL is the key. Receiver emails are masked in the view.
+
+## Paid webhook (t053)
+- Scheduled reminders are cut (council 7 Nov); only INVOICING.INVOICE.PAID is handled.
+- The raw body goes back to verify-webhook-signature untouched; re-serializing JSON can break verification.
+- The event id, the paid invoice, pot complete and the audit row are written in one transaction; a repeat id does nothing.
+- Unlike the spike, the work happens before replying: a 500 makes PayPal redeliver, and the event id makes that safe.
+- A PAID event counts only after a GET says PAID; otherwise we answer 500 and wait for the redelivery.
+- Tested with a real sandbox checkout, not the simulator (its events can't pass verification).
+- The board polls every 10 seconds while invoices are open, so a payment shows up without reloading.

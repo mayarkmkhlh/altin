@@ -67,5 +67,5 @@
 - The board polls every 10 seconds while invoices are open, so a payment shows up without reloading.
 
 ## CI (t092)
-- GitHub Actions on every push and pull request: npm ci, typecheck, tests, web build, on Node 22 (the version Render runs).
+- GitHub Actions on every push and pull request: npm ci, typecheck, tests, web build, on Node 22, the minimum in package.json engines.
 - Tests need no secrets: they use PGlite in memory and fake PayPal clients, so CI never touches the sandbox or Neon.

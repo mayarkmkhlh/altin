@@ -66,8 +66,14 @@ export function isPotComplete(turn: Turn): boolean {
   );
 }
 
+// A misheard "100000" must never become an invoice; real circles give a few hundred dollars a month.
+export const MAX_INVOICE_CENTS = 300_000;
+
 export function addInvoice(circle: Circle, memberId: string, amountCents: number): Circle {
   assertCents(amountCents);
+  if (amountCents > MAX_INVOICE_CENTS) {
+    throw new CircleError(`One invoice can be at most $${MAX_INVOICE_CENTS / 100}; check the amount with the organizer`);
+  }
   const turn = requireTurn(circle, "collecting");
   if (!circle.members.some((m) => m.id === memberId)) throw new CircleError(`Unknown member ${memberId}`);
   if (memberId === turn.hostId) throw new CircleError("The host does not invoice herself");

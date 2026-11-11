@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { circleView, maskEmail } from "./circle-view";
+import { circleView } from "./circle-view";
+import { maskEmail } from "./redact";
 import { approveRelease } from "./engine/circle";
 import { CircleStore } from "./store/circle-store";
 import { testDb } from "./test/test-db";

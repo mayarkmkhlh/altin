@@ -76,6 +76,14 @@
 - A failed background refresh keeps the last board instead of flashing an error mid-demo.
 - Avatars get a stable muted hue from the member's name.
 
+## Security pass (t056)
+- Secrets: every commit on every branch scanned for database URLs, PayPal and model keys and private keys: none. The one accidental .env.local commit was undone before any push. .gitignore now ignores every .env* except .env.example, plus key files.
+- Webhooks: every event goes back to PayPal's verify endpoint byte for byte; unverified or header-less events get a 400 and change nothing.
+- Money: invoices are capped at $3,000 each in the engine, checked for every member before the first PayPal call. Payouts are recomputed and compared with the proposal, claimed with a conditional update, and paid only to the host's stored email with a deterministic batch id.
+- Limits: the assistant allows 60 calls an hour overall and 20 per visitor (the last X-Forwarded-For entry, which Render's proxy sets); request bodies are capped at 100 KB; standard security headers on every response.
+- Personal data: the public activity feed masks every email; logs get one masked, shortened line per error, never the error object (AI SDK errors carry the whole prompt). Uncaught errors go through the same logger.
+- Known gap: there is no login. Anyone with a circle's link can see it and press Approve. The damage is bounded (only a complete pot, only to the host's stored email, only the recomputed amount, once), but a real launch needs organizer sign-in.
+
 ## CI (t092)
 - GitHub Actions on every push and pull request: npm ci, typecheck, tests, web build, on Node 22, the minimum in package.json engines.
 - Tests need no secrets: they use PGlite in memory and fake PayPal clients, so CI never touches the sandbox or Neon.

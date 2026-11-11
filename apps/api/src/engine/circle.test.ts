@@ -8,6 +8,7 @@ import {
   closeInvoice,
   createCircle,
   currentTurn,
+  MAX_INVOICE_CENTS,
   markReleased,
   potTotalCents,
   setInvoiceStatus,
@@ -63,6 +64,11 @@ test("variable pledges sum correctly into the payout", () => {
   const { payout } = approveRelease(circle);
   assert.equal(payout.amountCents, 5005);
   assert.equal(payout.receiverEmail, "layla@example.com");
+});
+
+test("an invoice above the cap is refused", () => {
+  assert.throws(() => addInvoice(activeCircle(), "noor", MAX_INVOICE_CENTS + 1), /at most/);
+  assert.equal(currentTurn(addInvoice(activeCircle(), "noor", MAX_INVOICE_CENTS))!.invoices.length, 1);
 });
 
 test("an unpaid invoice blocks completion", () => {

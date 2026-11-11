@@ -1,11 +1,7 @@
 import { addMonths } from "./engine/calendar";
 import { currentTurn, potTotalCents } from "./engine/circle";
+import { maskEmail, redactDetails } from "./redact";
 import type { CircleStore } from "./store/circle-store";
-
-export function maskEmail(email: string): string {
-  const [local = "", domain = ""] = email.split("@");
-  return `${local.slice(0, 1)}•••@${domain}`;
-}
 
 // Everything the organizer's screens show, read from stored facts only. Amounts are integer US cents.
 export async function circleView(store: CircleStore, circleId: string) {
@@ -75,7 +71,7 @@ export async function circleView(store: CircleStore, circleId: string) {
     gatherings,
     current,
     pendingPayouts,
-    activity: await store.listAudit(circleId),
+    activity: (await store.listAudit(circleId)).map((entry) => ({ ...entry, details: redactDetails(entry.details) })),
   };
 }
 

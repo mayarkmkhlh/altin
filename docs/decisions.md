@@ -63,7 +63,8 @@
 - The event id, the paid invoice, pot complete and the audit row are written in one transaction; a repeat id does nothing.
 - Unlike the spike, the work happens before replying: a 500 makes PayPal redeliver, and the event id makes that safe.
 - A PAID event counts only after a GET says PAID; otherwise we answer 500 and wait for the redelivery.
-- Tested with a real sandbox checkout, not the simulator (its events can't pass verification).
+- Tested with a real sandbox checkout, not the simulator (its events can't pass verification): paid 19:56:15, PayPal raised the event at :27, the board showed paid and pot complete at :42.
+- A resend of the same event through PayPal's resend API left one invoice_paid row.
 - The board polls every 10 seconds while invoices are open, so a payment shows up without reloading.
 
 ## CI (t092)

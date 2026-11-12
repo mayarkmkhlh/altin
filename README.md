@@ -87,6 +87,18 @@ Agent calls are rate-limited (20 per visitor and 60 overall per hour).
 
 **To build it.** Written with **Cursor** (agent mode) as a pair programmer: it wrote the code, tests and this README while I directed the design, reviewed each step and tested against the PayPal sandbox.
 
+## Proof
+
+- Webhook signature verification: tested in CI (forged event → 400 `missing signature headers`; verified live against the deployed endpoint)
+- Idempotency: each PayPal event id is stored under a unique constraint, so a repeat delivery does nothing
+- Approval gate: `propose_payout` only creates a request; a payout needs the organiser's tap on "Approve payout"
+- CI: ![CI](https://github.com/mayarkmkhlh/altin/actions/workflows/ci.yml/badge.svg)
+
+## Money and regulation
+
+PayPal sandbox prototype. Funds stay in the organiser's PayPal account; Altın has no custody.
+A live version would need SAMA licensing or a review with a licensed partner.
+
 ## For judges: try it
 
 Open the [demo circle](https://altin-ub0c.onrender.com/circles/c2044677-ef41-4931-aa65-4c9a7531402e). Eight of nine members have paid; one invoice is open.

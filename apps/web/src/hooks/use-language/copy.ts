@@ -4,6 +4,16 @@ import type { Language } from "../../lib/types/language.type";
 type Details = Record<string, unknown>;
 type Money = (cents: unknown) => string;
 
+const membersEn = (count: number) => (count === 1 ? "1 member" : `${count} members`);
+
+// Arabic counts: 1 and 2 take their own forms, 3 to 10 the plural, 11 and up the singular.
+function membersAr(count: number): string {
+  if (count === 1) return "عضوة وحدة";
+  if (count === 2) return "عضوتين";
+  if (count >= 3 && count <= 10) return `${count} عضوات`;
+  return `${count} عضوة`;
+}
+
 export type Copy = {
   appName: string;
   tagline: string;
@@ -161,7 +171,7 @@ const en: Copy = {
     ],
     circleHint: (circle) => `Ask me anything about ${circle}.`,
     circlePrompts: ["Send this gathering's invoices.", "Has everyone paid? If so, prepare the payout."],
-    members: (count) => `${count} members`,
+    members: membersEn,
     schedule: "Schedule",
     monthlyFrom: (month) => `Monthly from ${month}`,
     amount: "Amount",
@@ -180,7 +190,7 @@ const en: Copy = {
     readyFor: (host) => `ready for ${host}`,
     receives: (host) => `${host} receives`,
     from: "From",
-    ownAmounts: (count) => `${count} members, own amounts`,
+    ownAmounts: (count) => `${membersEn(count)}, own amounts`,
     range: "Largest · smallest",
     proposedBy: "Proposed by",
     assistantAgo: (ago) => `Assistant · ${ago}`,
@@ -308,7 +318,7 @@ const ar: Copy = {
     ],
     circleHint: (circle) => `اسأليني أي شي عن ${circle}.`,
     circlePrompts: ["أرسلي فواتير هالجمعة.", "دفعوا الكل؟ إذا إي جهّزي الصرف."],
-    members: (count) => `${count} عضوات`,
+    members: membersAr,
     schedule: "الموعد",
     monthlyFrom: (month) => `كل شهر من ${month}`,
     amount: "المبلغ",
@@ -327,7 +337,7 @@ const ar: Copy = {
     readyFor: (host) => `جاهز لـ${host}`,
     receives: (host) => `تستلم ${host}`,
     from: "من",
-    ownAmounts: (count) => `${count} عضوات، كل وحدة بمبلغها`,
+    ownAmounts: (count) => `${membersAr(count)}، كل وحدة بمبلغها`,
     range: "الأعلى · الأقل",
     proposedBy: "اقترحه",
     assistantAgo: (ago) => `المساعد · ${ago}`,
